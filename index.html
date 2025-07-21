@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <meta charset="UTF-8">
+    <title>Weight Loss Forecast</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: auto;
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+
+        #infoBox {
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin-top: 20px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        #infoBox h2 {
+            margin-top: 0;
+        }
+
+        input,
+        button {
+            margin-top: 5px;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+        input {
+            background-color: #3a3a3a;
+            color: #ffffff;
+        }
+
+        button {
+            background-color: #3a3a3a;
+            color: #ffffff;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        ul {
+            margin-top: 20px;
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 4px 0;
+        }
+
+        canvas {
+            max-width: 100%;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+        }
+
+        #forecastOutput,
+        #regressionStats {
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-top: 12px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            font-weight: bold;
+        }
+
+        #entryList {
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            color: #ffffff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Weight Loss Forecast</h1>
+
+    <div id="infoBox">
+        <h2>About This Tool</h2>
+        <p>
+            HOW IT WORKS:
+        </p>
+        <p>
+            This weight forecast tool uses a linear regression model to estimate when you might reach your target weight
+            based on your logged data. It is for informational purposes only and does not replace professional medical
+            advice.
+        </p>
+        <p>
+            DATA QUANTITY MATTERS:
+        </p>
+        <p>
+            The accuracy of this forecast improves as you log more daily weight entries over time. More data helps the model identify your true trend.
+        </p>
+        <p>
+            For best results, try to log your weight the same time each day (e.g. morning).
+        </p>
+        <p>
+            LIMITATIONS:
+        </p>
+        <p>
+            The linear regression model assumes weight changes linearly over time. Real weight fluctuations can be affected by many factors not captured here.
+        </p>
+        <p>
+            Always consult a healthcare professional before starting any weight management program.
+            Use this tool as a motivational aid and trend tracker; it is not a substitute for professional medical advice or personalized nutrition and exercise planning.
+        </p>
+        <p>
+            PRIVACY NOTE:
+        </p>
+        <p>
+            All data you enter stays on your device and is not stored or transmitted anywhere.
+        </p>
+    </div>
+
+
+    <label for="date">Date:</label>
+    <input type="date" id="date">
+
+    <label for="weight">Weight (kg):</label>
+    <input type="number" id="weight" step="0.1">
+
+    <label for="targetWeight">Target Weight (kg):</label>
+    <input type="number" id="targetWeight" step="0.1">
+
+    <button onclick="addEntry()">Add Entry</button>
+
+    <button onClick="resetAll()">Reset</button>
+
+    <ul id="entryList">
+        <!-- Entries will appear here -->
+    </ul>
+    <canvas id="weightChart" width="600" height="400"></canvas>
+    <p id="forecastOutput" style="margin-top: 20px; font-weight: bold;"></p>
+
+    <h2>Forecast Chart</h2>
+    <canvas id="forecastChart" width="600" height="400"></canvas>
+    <p id="regressionStats" style="margin-top: 10px;"></p>
+
+    <script>
+        // JS
+        const entries = [];
+
+        // WEIGHT CHART
+        let chart = new Chart(document.getElementById('weightChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Weight (kg)',
+                    data: [],
+                    fill: false,
+                    borderColor: 'blue',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Date' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Weight (kg)' }
+                    }
+                }
+            }
+        });
+
+        // FORECAST CHART
+        let forecastChart = new Chart(document.getElementById('forecastChart'), {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'Actual Weights',
+                        data: [], // To be filled with {x, y}
+                        backgroundColor: 'blue',
+                        showLine: false
+                    },
+                    {
+                        label: 'Regression Line',
+                        data: [], // To be filled with 2 points {x, y}
+                        borderColor: 'red',
+                        type: 'line',
+                        fill: false,
+                        pointRadius: 0,
+                        borderWidth: 2,
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Days since start' },
+                        type: 'linear',
+                        position: 'bottom'
+                    },
+                    y: {
+                        title: { display: true, text: 'Weight (kg)' }
+                    }
+                }
+            }
+        });
+
+        // UPDATE FORECAST CHART
+        function updateForecastChart(entries) {
+            if (entries.length < 2) return;
+            const firstDate = new Date(entries[0].date);
+            const x = entries.map(e => (new Date(e.date) - firstDate) / (1000 * 60 * 60 * 24));
+            const y = entries.map(e => e.weight);
+
+            const n = x.length;
+            const sumX = x.reduce((a, b) => a + b, 0);
+            const sumY = y.reduce((a, b) => a + b, 0);
+            const sumXY = x.reduce((acc, val, i) => acc + val * y[i], 0);
+            const sumX2 = x.reduce((acc, val) => acc + val * val, 0);
+
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+
+            // Scatter points
+            const scatterPoints = x.map((val, i) => ({ x: val, y: y[i] }));
+
+            // Calculate targetX from your goal
+            const targetWeight = parseFloat(document.getElementById('targetWeight').value);
+            let targetX = null;
+            if (!isNaN(targetWeight) && slope !== 0) {
+                targetX = (targetWeight - intercept) / slope;
+            }
+
+            // Extend line to targetX (or just a bit beyond your last point)
+            const maxX = targetX && targetX > 0 ? targetX : Math.max(...x);
+            const regressionLine = [
+                { x: 0, y: intercept },
+                { x: maxX, y: slope * maxX + intercept }
+            ];
+
+            // Update forecastChart
+            forecastChart.data.datasets[0].data = scatterPoints;
+            forecastChart.data.datasets[1].data = regressionLine;
+            forecastChart.update();
+
+            // show R^2
+            const meanY = sumY / n;
+            const ssTot = y.reduce((acc, yi) => acc + Math.pow(yi - meanY, 2), 0);
+            const ssRes = y.reduce((acc, yi, i) => acc + Math.pow(yi - (slope * x[i] + intercept), 2), 0);
+            const rSquared = 1 - ssRes / ssTot;
+
+            let trendText = '';
+            if (slope < 0) {
+                trendText = `You're losing about ${Math.abs(slope).toFixed(2)} kg per day.`;
+            } else if (slope > 0) {
+                trendText = `You're gaining about ${slope.toFixed(2)} kg per day.`;
+            } else {
+                trendText = `Your weight is staying about the same.`;
+            }
+
+            const statsText =
+                `R² = ${rSquared.toFixed(2)} — About ${(rSquared * 100).toFixed(0)}% of your weight change over time can be explained by this trend line.<br><br>` +
+                trendText;
+
+            document.getElementById('regressionStats').innerHTML = statsText;
+        }
+
+        function addEntry() {
+            const date = document.getElementById('date').value;
+            const weight = parseFloat(document.getElementById('weight').value);
+
+            if (!date || isNaN(weight)) {
+                alert('Please enter a valid date and weight.');
+                return;
+            }
+
+            entries.push({ date, weight });
+
+            // Sort entries by date
+            entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // Update chart
+            chart.data.labels = entries.map(entry => entry.date);
+            chart.data.datasets[0].data = entries.map(entry => entry.weight);
+            chart.update();
+
+            // Show entry in list
+            const entryList = document.getElementById('entryList');
+            const li = document.createElement('li');
+            li.textContent = `${date}: ${weight} kg`;
+            entryList.appendChild(li);
+
+            // Clear inputs
+            document.getElementById('date').value = '';
+            document.getElementById('weight').value = '';
+
+            const targetWeight = parseFloat(document.getElementById('targetWeight').value);
+            const forecastOutput = document.getElementById('forecastOutput');
+
+            if (!isNaN(targetWeight)) {
+                const prediction = estimateGoalDate(entries, targetWeight);
+                forecastOutput.textContent = prediction
+                    ? `Estimated date to reach ${targetWeight} kg: ${prediction}`
+                    : 'Trend unclear or not enough data for prediction.';
+            } else {
+                forecastOutput.textContent = '';
+            }
+            updateForecastChart(entries);
+        }
+
+        // RESET BUTTON LOGIC
+        function resetAll() {
+            entries.length = 0; // Clears the entries array
+            document.getElementById('entryList').innerHTML = ''; // Clears list of entries on page
+
+            // Clear the chart
+            chart.data.labels = [];
+            chart.data.datasets[0].data = [];
+            chart.update();
+
+            // Clear forecast message
+            document.getElementById('forecastOutput').textContent = '';
+
+            forecastChart.data.datasets[0].data = [];
+            forecastChart.data.datasets[1].data = [];
+            forecastChart.update();
+            document.getElementById('regressionStats').textContent = '';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            flatpickr("#date", {
+                dateFormat: "Y-m-d",
+                defaultDate: "today",
+                altInput: true,
+                altFormat: "F j, Y"
+            });
+        });
+
+        function estimateGoalDate(entries, targetWeight) {
+            if (entries.length < 2) return null;
+
+            // Convert dates to day offsets
+            const firstDate = new Date(entries[0].date);
+            const x = entries.map(e => (new Date(e.date) - firstDate) / (1000 * 60 * 60 * 24)); // days since first entry
+            const y = entries.map(e => e.weight);
+
+            // Simple linear regression
+            const n = x.length;
+            const sumX = x.reduce((a, b) => a + b, 0);
+            const sumY = y.reduce((a, b) => a + b, 0);
+            const sumXY = x.reduce((acc, val, i) => acc + val * y[i], 0);
+            const sumX2 = x.reduce((acc, val) => acc + val * val, 0);
+
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+
+            if (slope === 0) return null; // avoid division by zero
+
+            // Calculate x when y = targetWeight
+            const targetX = (targetWeight - intercept) / slope;
+
+            if (targetX < 0) return null; // invalid prediction
+
+            const targetDate = new Date(firstDate.getTime() + targetX * 24 * 60 * 60 * 1000);
+            return targetDate.toDateString();
+        }
+
+    </script>
+
+</body>
+
+</html>
