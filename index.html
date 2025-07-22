@@ -5,7 +5,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Weight Loss Forecast</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -291,29 +291,34 @@
             <p>HOW IT WORKS:</p>
             <p>
                 This weight forecast tool uses a linear regression model to estimate when you might reach your target
-                weight based on your logged data. It is for informational purposes only and does not replace
+                weight based on your logged data. Additionally, it calculates your BMI based on your height and weight. 
+                It is for informational purposes only and does not replace
                 professional medical advice.
             </p>
             <p>DATA QUANTITY MATTERS:</p>
             <p>
                 The accuracy of this forecast improves as you log more daily weight entries over time. More data helps
-                the model identify your true trend. For best results, try to log your weight the same time each day (e.g. morning).</p>
+                the model identify your true trend. For best results, try to log your weight the same time each day (e.g. morning).
+            </p>
         </div>
 
         <label for="targetWeight">Target Weight (kg):</label>
-        <input type="number" id="targetWeight" step="0.1">
+        <input type="number" id="targetWeight" step="0.1" />
+
+        <!-- Added height input for BMI -->
+        <label for="heightCm">Height (cm):</label>
+        <input type="number" id="heightCm" step="0.1" min="50" max="300" placeholder="e.g. 175" />
 
         <div id="entryBox">
             <label for="date">Date:</label>
-            <input type="date" id="date">
+            <input type="date" id="date" />
 
             <label for="weight">Weight (kg):</label>
-            <input type="number" id="weight" step="0.1">
+            <input type="number" id="weight" step="0.1" />
 
             <button onclick="addEntry()">Add Entry</button>
             <button onclick="resetAll()">Reset</button>
         </div>
-
     </div>
 
     <div id="localSaveInfo"
@@ -334,6 +339,12 @@
 
     <div class="chart-wrapper" style="position: relative; width: 100%; height: 450px; margin-top: 20px;">
         <canvas id="forecastChart"></canvas>
+    </div>
+
+    <!-- Added BMI Chart -->
+    <h2>BMI Chart</h2>
+    <div class="chart-wrapper" style="position: relative; width: 100%; height: 450px; margin-top: 20px;">
+        <canvas id="bmiChart"></canvas>
     </div>
 
     <div id="forecastResults" style="margin-top: 20px; font-weight: bold;">
@@ -358,19 +369,24 @@
             <p>PRIVACY NOTE:</p>
             <p>All data you enter stays on your device and is not stored or transmitted anywhere.</p>
         </div>
+
         <script>
             // Keep a single entries array for all data
             const entries = [];
 
             // Load saved entries and initialize flatpickr when DOM is ready
-            document.addEventListener('DOMContentLoaded', function () {
-                const savedEntries = localStorage.getItem('weightEntries');
+            document.addEventListener("DOMContentLoaded", function () {
+                const savedEntries = localStorage.getItem("weightEntries");
                 if (savedEntries) {
                     const parsedEntries = JSON.parse(savedEntries);
-                    parsedEntries.forEach(entry => entries.push(entry));
-                    const savedTarget = localStorage.getItem('targetWeight');
+                    parsedEntries.forEach((entry) => entries.push(entry));
+                    const savedTarget = localStorage.getItem("targetWeight");
                     if (savedTarget !== null) {
-                        document.getElementById('targetWeight').value = savedTarget;
+                        document.getElementById("targetWeight").value = savedTarget;
+                    }
+                    const savedHeight = localStorage.getItem("heightCm");
+                    if (savedHeight !== null) {
+                        document.getElementById("heightCm").value = savedHeight;
                     }
                     updateUI();
                 }
@@ -379,17 +395,42 @@
                     dateFormat: "Y-m-d",
                     defaultDate: "today",
                     altInput: true,
-                    altFormat: "F j, Y"
+                    altFormat: "F j, Y",
                 });
             });
 
-            document.getElementById('targetWeight').addEventListener('input', function () {
-                localStorage.setItem('targetWeight', this.value);
+            document
+                .getElementById("targetWeight")
+                .addEventListener("input", function () {
+                    localStorage.setItem("targetWeight", this.value);
+                    updateUI();
+                });
+
+            // Save height input to localStorage and update UI
+            document.getElementById("heightCm").addEventListener("input", function () {
+                localStorage.setItem("heightCm", this.value);
+                updateUI();
             });
 
             // Save entries array to localStorage
             function saveEntries() {
-                localStorage.setItem('weightEntries', JSON.stringify(entries));
+                localStorage.setItem("weightEntries", JSON.stringify(entries));
+            }
+
+            // Calculate BMI helper
+            function calculateBMI(weightKg, heightCm) {
+                if (!weightKg || !heightCm) return null;
+                const heightM = heightCm / 100;
+                return weightKg / (heightM * heightM);
+            }
+
+            // BMI category helper
+            function getBMICategory(bmi) {
+                if (bmi === null) return "N/A";
+                if (bmi < 18.5) return "Underweight";
+                if (bmi < 25) return "Normal weight";
+                if (bmi < 30) return "Overweight";
+                return "Obese";
             }
 
             // Update UI and charts based on current entries
@@ -397,27 +438,27 @@
                 // Sort entries by date
                 entries.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-                const entryList = document.getElementById('entryList');
-                entryList.innerHTML = '';
+                const entryList = document.getElementById("entryList");
+                entryList.innerHTML = "";
 
                 entries.forEach((entry, index) => {
-                    const li = document.createElement('li');
-                    li.style.display = 'flex';
-                    li.style.justifyContent = 'space-between';
-                    li.style.alignItems = 'center';
-                    li.style.padding = '6px 0';
+                    const li = document.createElement("li");
+                    li.style.display = "flex";
+                    li.style.justifyContent = "space-between";
+                    li.style.alignItems = "center";
+                    li.style.padding = "6px 0";
 
                     // Entry text
-                    const entryText = document.createElement('span');
+                    const entryText = document.createElement("span");
                     entryText.textContent = `${entry.date}: ${entry.weight} kg`;
                     li.appendChild(entryText);
 
                     // Container for buttons
-                    const btnContainer = document.createElement('span');
+                    const btnContainer = document.createElement("span");
 
                     // Delete button
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.textContent = 'Delete';
+                    const deleteBtn = document.createElement("button");
+                    deleteBtn.textContent = "Delete";
                     deleteBtn.onclick = () => deleteEntry(index);
                     btnContainer.appendChild(deleteBtn);
 
@@ -425,28 +466,92 @@
                     entryList.appendChild(li);
                 });
 
+                // Calculate BMI values for chart and current BMI display
+                const heightCm = parseFloat(document.getElementById("heightCm").value);
+                const bmiValues = [];
+
+                entries.forEach((entry) => {
+                    const bmi = calculateBMI(entry.weight, heightCm);
+                    bmiValues.push({ date: entry.date, bmi: bmi });
+                });
+
                 // Update charts and forecast output as before...
-                chart.data.labels = entries.map(entry => entry.date);
-                chart.data.datasets[0].data = entries.map(entry => entry.weight);
+                chart.data.labels = entries.map((entry) => entry.date);
+                chart.data.datasets[0].data = entries.map((entry) => entry.weight);
                 chart.update();
 
-                const targetWeight = parseFloat(document.getElementById('targetWeight').value);
-                const forecastOutput = document.getElementById('forecastOutput');
+                // Update BMI Chart
+                bmiChart.data.labels = bmiValues.map((entry) => entry.date);
+                bmiChart.data.datasets[0].data = bmiValues.map((entry) => entry.bmi);
+                bmiChart.update();
+
+                const targetWeight = parseFloat(
+                    document.getElementById("targetWeight").value
+                );
+                const forecastOutput = document.getElementById("forecastOutput");
+
                 if (!isNaN(targetWeight)) {
-                    const prediction = estimateGoalDate(entries, targetWeight);
-                    forecastOutput.textContent = prediction
-                        ? `Estimated date to reach ${targetWeight} kg: ${prediction}`
-                        : 'Trend unclear or not enough data for prediction.';
+                    const latestWeight =
+                        entries.length > 0 ? entries[entries.length - 1].weight : null;
+
+                    if (latestWeight !== null && latestWeight <= targetWeight) {
+                        // Congratulate if target reached or passed
+                        forecastOutput.textContent = `🎉 Target weight of ${targetWeight} kg reached, congratulations! 🎉`;
+                    } else {
+                        const prediction = estimateGoalDate(entries, targetWeight);
+                        forecastOutput.textContent = prediction
+                            ? `Estimated date to reach ${targetWeight} kg: ${prediction}`
+                            : "Trend unclear or not enough data for prediction.";
+                    }
                 } else {
-                    forecastOutput.textContent = '';
+                    forecastOutput.textContent = "";
                 }
 
                 updateForecastChart(entries);
+
+                // Calculate and display goal progress % with sign (negative if moving away)
+                const startWeight = entries.length ? entries[0].weight : null;
+                const currentWeight = entries.length ? entries[entries.length - 1].weight : null;
+                let progressText = "";
+
+                if (
+                    startWeight !== null &&
+                    currentWeight !== null &&
+                    !isNaN(targetWeight)
+                ) {
+                    const totalChange = targetWeight - startWeight;  // signed difference
+                    const progressChange = currentWeight - startWeight;  // signed progress
+
+                    if (totalChange !== 0) {
+                        let progressPercent = (progressChange / totalChange) * 100;
+                        // Cap between -100% and 100% for display sanity
+                        if (progressPercent > 100) progressPercent = 100;
+                        if (progressPercent < -100) progressPercent = -100;
+                        progressText = `Goal Progress: ${progressPercent.toFixed(1)}%`;
+                    }
+                }
+
+                // Current BMI & category display
+                const latestBMI = bmiValues.length
+                    ? bmiValues[bmiValues.length - 1].bmi
+                    : null;
+                const bmiText = latestBMI
+                    ? `Current BMI: ${latestBMI.toFixed(1)} (${getBMICategory(
+                          latestBMI
+                      )})`
+                    : "Current BMI: N/A";
+
+                // Add R² stats & trend text from forecastChart update to regressionStats with progress & BMI
+                const statsText = document
+                    .getElementById("regressionStats")
+                    .innerHTML.split("<br><br>")[0]; // preserve only R² & trend from forecastChart
+                document.getElementById("regressionStats").innerHTML =
+                    statsText + "<br><br>" + progressText + "<br><br>" + bmiText;
             }
 
             // Delete an entry with confirmation
             function deleteEntry(index) {
-                if (confirm('Are you sure you want to delete this entry?')) {
+                if (confirm("Are you sure you want to delete this entry?")) {
                     entries.splice(index, 1);
                     saveEntries();
                     updateUI();
@@ -455,11 +560,11 @@
 
             // Add new entry and update everything
             function addEntry() {
-                const date = document.getElementById('date').value;
-                const weight = parseFloat(document.getElementById('weight').value);
+                const date = document.getElementById("date").value;
+                const weight = parseFloat(document.getElementById("weight").value);
 
                 if (!date || isNaN(weight)) {
-                    alert('Please enter a valid date and weight.');
+                    alert("Please enter a valid date and weight.");
                     return;
                 }
 
@@ -468,16 +573,16 @@
                 updateUI();
 
                 // Clear inputs
-                document.getElementById('date').value = '';
-                document.getElementById('weight').value = '';
+                document.getElementById("date").value = "";
+                document.getElementById("weight").value = "";
             }
 
             // Reset all data and clear localStorage
             function resetAll() {
                 entries.length = 0;
-                localStorage.removeItem('weightEntries');
+                localStorage.removeItem("weightEntries");
 
-                document.getElementById('entryList').innerHTML = '';
+                document.getElementById("entryList").innerHTML = "";
 
                 chart.data.labels = [];
                 chart.data.datasets[0].data = [];
@@ -487,73 +592,111 @@
                 forecastChart.data.datasets[1].data = [];
                 forecastChart.update();
 
-                document.getElementById('forecastOutput').textContent = '';
-                document.getElementById('regressionStats').textContent = '';
+                bmiChart.data.labels = [];
+                bmiChart.data.datasets[0].data = [];
+                bmiChart.update();
+
+                document.getElementById("forecastOutput").textContent = "";
+                document.getElementById("regressionStats").textContent = "";
             }
 
             // Chart.js weight chart setup
-            let chart = new Chart(document.getElementById('weightChart'), {
-                type: 'line',
+            let chart = new Chart(document.getElementById("weightChart"), {
+                type: "line",
                 data: {
                     labels: [],
-                    datasets: [{
-                        label: 'Weight (kg)',
-                        data: [],
-                        fill: false,
-                        borderColor: 'blue',
-                        tension: 0.1
-                    }]
+                    datasets: [
+                        {
+                            label: "Weight (kg)",
+                            data: [],
+                            fill: false,
+                            borderColor: "blue",
+                            tension: 0.1,
+                        },
+                    ],
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
                         x: {
-                            title: { display: true, text: 'Date' }
+                            title: { display: true, text: "Date" },
                         },
                         y: {
-                            title: { display: true, text: 'Weight (kg)' }
-                        }
-                    }
-                }
+                            title: { display: true, text: "Weight (kg)" },
+                        },
+                    },
+                },
             });
 
             // Chart.js forecast chart setup
-            let forecastChart = new Chart(document.getElementById('forecastChart'), {
-                type: 'scatter',
+            let forecastChart = new Chart(
+                document.getElementById("forecastChart"),
+                {
+                    type: "scatter",
+                    data: {
+                        datasets: [
+                            {
+                                label: "Actual Weights",
+                                data: [],
+                                backgroundColor: "blue",
+                                showLine: false,
+                            },
+                            {
+                                label: "Regression Line",
+                                data: [],
+                                borderColor: "red",
+                                type: "line",
+                                fill: false,
+                                pointRadius: 0,
+                                borderWidth: 2,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: { display: true, text: "Days since start" },
+                                type: "linear",
+                                position: "bottom",
+                            },
+                            y: {
+                                title: { display: true, text: "Weight (kg)" },
+                            },
+                        },
+                    },
+                }
+            );
+
+            // Chart.js BMI chart setup
+            let bmiChart = new Chart(document.getElementById("bmiChart"), {
+                type: "line",
                 data: {
+                    labels: [], // dates
                     datasets: [
                         {
-                            label: 'Actual Weights',
+                            label: "BMI",
                             data: [],
-                            backgroundColor: 'blue',
-                            showLine: false
-                        },
-                        {
-                            label: 'Regression Line',
-                            data: [],
-                            borderColor: 'red',
-                            type: 'line',
                             fill: false,
-                            pointRadius: 0,
-                            borderWidth: 2,
-                        }
-                    ]
+                            borderColor: "orange",
+                            tension: 0.1,
+                        },
+                    ],
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
                         x: {
-                            title: { display: true, text: 'Days since start' },
-                            type: 'linear',
-                            position: 'bottom'
+                            title: { display: true, text: "Date" },
                         },
                         y: {
-                            title: { display: true, text: 'Weight (kg)' }
-                        }
-                    }
-                }
+                            title: { display: true, text: "BMI" },
+                        },
+                    },
+                },
             });
 
             // Update forecast chart and regression stats
@@ -561,8 +704,10 @@
                 if (entries.length < 2) return;
 
                 const firstDate = new Date(entries[0].date);
-                const x = entries.map(e => (new Date(e.date) - firstDate) / (1000 * 60 * 60 * 24));
-                const y = entries.map(e => e.weight);
+                const x = entries.map(
+                    (e) => (new Date(e.date) - firstDate) / (1000 * 60 * 60 * 24)
+                );
+                const y = entries.map((e) => e.weight);
 
                 const n = x.length;
                 const sumX = x.reduce((a, b) => a + b, 0);
@@ -575,7 +720,9 @@
 
                 const scatterPoints = x.map((val, i) => ({ x: val, y: y[i] }));
 
-                const targetWeight = parseFloat(document.getElementById('targetWeight').value);
+                const targetWeight = parseFloat(
+                    document.getElementById("targetWeight").value
+                );
                 let targetX = null;
                 if (!isNaN(targetWeight) && slope !== 0) {
                     targetX = (targetWeight - intercept) / slope;
@@ -584,7 +731,7 @@
                 const maxX = targetX && targetX > 0 ? targetX : Math.max(...x);
                 const regressionLine = [
                     { x: 0, y: intercept },
-                    { x: maxX, y: slope * maxX + intercept }
+                    { x: maxX, y: slope * maxX + intercept },
                 ];
 
                 forecastChart.data.datasets[0].data = scatterPoints;
@@ -594,12 +741,17 @@
                 // R² calculation
                 const meanY = sumY / n;
                 const ssTot = y.reduce((acc, yi) => acc + Math.pow(yi - meanY, 2), 0);
-                const ssRes = y.reduce((acc, yi, i) => acc + Math.pow(yi - (slope * x[i] + intercept), 2), 0);
+                const ssRes = y.reduce(
+                    (acc, yi, i) => acc + Math.pow(yi - (slope * x[i] + intercept), 2),
+                    0
+                );
                 const rSquared = 1 - ssRes / ssTot;
 
-                let trendText = '';
+                let trendText = "";
                 if (slope < 0) {
-                    trendText = `You're losing about ${Math.abs(slope).toFixed(2)} kg per day.`;
+                    trendText = `You're losing about ${Math.abs(slope).toFixed(
+                        2
+                    )} kg per day.`;
                 } else if (slope > 0) {
                     trendText = `You're gaining about ${slope.toFixed(2)} kg per day.`;
                 } else {
@@ -607,10 +759,14 @@
                 }
 
                 const statsText =
-                    `R² = ${rSquared.toFixed(2)} — About ${(rSquared * 100).toFixed(0)}% of your weight change over time can be explained by this trend line.<br><br>` +
+                    `R² = ${rSquared.toFixed(
+                        2
+                    )} — About ${(rSquared * 100).toFixed(
+                        0
+                    )}% of your weight change over time can be explained by this trend line.<br><br>` +
                     trendText;
 
-                document.getElementById('regressionStats').innerHTML = statsText;
+                document.getElementById("regressionStats").innerHTML = statsText;
             }
 
             // Estimate goal date using linear regression
@@ -618,8 +774,10 @@
                 if (entries.length < 2) return null;
 
                 const firstDate = new Date(entries[0].date);
-                const x = entries.map(e => (new Date(e.date) - firstDate) / (1000 * 60 * 60 * 24));
-                const y = entries.map(e => e.weight);
+                const x = entries.map(
+                    (e) => (new Date(e.date) - firstDate) / (1000 * 60 * 60 * 24)
+                );
+                const y = entries.map((e) => e.weight);
 
                 const n = x.length;
                 const sumX = x.reduce((a, b) => a + b, 0);
@@ -636,10 +794,13 @@
 
                 if (targetX < 0) return null;
 
-                const targetDate = new Date(firstDate.getTime() + targetX * 24 * 60 * 60 * 1000);
+                const targetDate = new Date(
+                    firstDate.getTime() + targetX * 24 * 60 * 60 * 1000
+                );
                 return targetDate.toDateString();
             }
         </script>
+    </div>
 </body>
 
 </html>
