@@ -364,6 +364,10 @@
             if (savedEntries) {
                 const parsedEntries = JSON.parse(savedEntries);
                 parsedEntries.forEach(entry => entries.push(entry));
+                const savedTarget = localStorage.getItem('targetWeight');
+                if (savedTarget !== null) {
+                    document.getElementById('targetWeight').value = savedTarget;
+                }
                 updateUI();
             }
 
@@ -373,6 +377,10 @@
                 altInput: true,
                 altFormat: "F j, Y"
             });
+        });
+
+        document.getElementById('targetWeight').addEventListener('input', function () {
+            localStorage.setItem('targetWeight', this.value);
         });
 
         // Save entries array to localStorage
